@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>IA Daytrade — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#080c14;--panel:#0d1420;--card:#101928;--border:#1a2a3a;
+      --cyan:#00d4ff;--green:#00ff88;--red:#ff3355;--yellow:#ffcc00;
+      --purple:#8b5cf6;--text:#8ba4b8;--dim:#4a6278;--white:#e2eaf0;
+    }
+    html,body{height:100%;overflow:hidden}
+    body{font-family:'JetBrains Mono',Consolas,monospace;background:var(--bg);color:var(--text);font-size:12px}
+    ::-webkit-scrollbar{width:4px;height:4px}
+    ::-webkit-scrollbar-track{background:var(--bg)}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+    /* ── Layout ────────────────────────────────────────────── */
+    #app{display:flex;flex-direction:column;height:100vh}
+
+    /* ── Header ────────────────────────────────────────────── */
+    header{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;border-bottom:1px solid var(--border);background:var(--panel);flex-shrink:0;gap:16px}
+    .logo{display:flex;align-items:center;gap:8px}
+    .logo-icon{position:relative}
+    .logo-icon svg{color:var(--cyan)}
+    .logo-dot{position:absolute;top:-2px;right:-2px;width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+    .logo-text{font-size:14px;font-weight:700;letter-spacing:.15em}
+    .logo-text .w{color:var(--white)}.logo-text .c{color:var(--cyan)}
+    .badge{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.12em;border:1px solid rgba(0,212,255,.4);background:rgba(0,212,255,.08);color:var(--cyan)}
+    .hdr-nav{display:flex;align-items:center;gap:4px;padding:4px;background:var(--bg);border-radius:6px}
+    .nav-a{padding:5px 12px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.1em;border:1px solid transparent;cursor:pointer;text-decoration:none;transition:all .15s;font-family:inherit;color:var(--dim);background:transparent}
+    .nav-a:hover{color:var(--text)}
+    .nav-a.active{background:var(--panel);color:var(--cyan);border-color:rgba(0,212,255,.4)}
+    #clock{padding:5px 12px;border-radius:4px;border:1px solid var(--border);background:var(--bg);color:var(--white);font-size:12px}
+    #conn-status{padding:4px 10px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.1em;border:1px solid var(--border);transition:all .3s}
+    #conn-status.ok{color:var(--green);border-color:rgba(0,255,136,.3);background:rgba(0,255,136,.06)}
+    #conn-status.err{color:var(--red);border-color:rgba(255,51,85,.3);background:rgba(255,51,85,.06)}
+
+    /* ── Status strip ──────────────────────────────────────── */
+    #status-strip{display:flex;gap:1px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--border)}
+    .stat-card{flex:1;background:var(--panel);padding:10px 14px;display:flex;flex-direction:column;gap:3px;min-width:0}
+    .stat-card .s-label{font-size:8px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+    .stat-card .s-value{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .stat-card .s-sub{font-size:9px;color:var(--dim);font-variant-numeric:tabular-nums}
+
+    /* ── Main grid ─────────────────────────────────────────── */
+    #main-grid{display:flex;flex:1;overflow:hidden;gap:1px;background:var(--border)}
+
+    /* ── Left column ───────────────────────────────────────── */
+    #col-left{flex:1;display:flex;flex-direction:column;gap:1px;background:var(--border);overflow:hidden}
+
+    /* ── Right column ──────────────────────────────────────── */
+    #col-right{width:420px;flex-shrink:0;display:flex;flex-direction:column;gap:1px;background:var(--border);overflow:hidden}
+
+    /* ── Section ───────────────────────────────────────────── */
+    .section{background:var(--panel);display:flex;flex-direction:column;overflow:hidden}
+    .section-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+    .section-title{font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--dim)}
+    .section-count{font-size:9px;font-weight:700;color:var(--cyan);padding:1px 6px;border-radius:3px;background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.2)}
+    .section-body{flex:1;overflow-y:auto;padding:8px}
+
+    /* ── Table ─────────────────────────────────────────────── */
+    .tbl{width:100%;border-collapse:collapse;font-size:10px}
+    .tbl th{padding:4px 8px;text-align:left;font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);white-space:nowrap}
+    .tbl td{padding:5px 8px;border-bottom:1px solid rgba(26,42,58,.5);font-variant-numeric:tabular-nums;white-space:nowrap}
+    .tbl tr:last-child td{border-bottom:none}
+    .tbl tr:hover td{background:rgba(255,255,255,.015)}
+
+    /* ── Position row ──────────────────────────────────────── */
+    .side-chip{padding:1px 5px;border-radius:3px;font-size:8px;font-weight:700;letter-spacing:.08em}
+    .side-long{background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.25)}
+    .side-short{background:rgba(255,51,85,.1);color:var(--red);border:1px solid rgba(255,51,85,.25)}
+
+    /* ── Signal chip ───────────────────────────────────────── */
+    .sig-chip{padding:1px 5px;border-radius:3px;font-size:8px;font-weight:700;letter-spacing:.08em}
+    .sig-comprar{background:rgba(0,255,136,.08);color:var(--green);border:1px solid rgba(0,255,136,.2)}
+    .sig-vender{background:rgba(255,51,85,.08);color:var(--red);border:1px solid rgba(255,51,85,.2)}
+    .sig-aguardar{background:rgba(74,98,120,.12);color:var(--dim);border:1px solid rgba(74,98,120,.3)}
+
+    /* ── Empty state ───────────────────────────────────────── */
+    .empty-state{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;padding:32px 16px;opacity:.5;text-align:center}
+    .empty-icon{font-size:28px;opacity:.4}
+    .empty-msg{font-size:11px;color:var(--white);font-weight:600}
+    .empty-sub{font-size:10px;color:var(--dim)}
+
+    /* ── Tabs ──────────────────────────────────────────────── */
+    .tab-bar{display:flex;gap:1px;padding:6px 8px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0}
+    .tab-btn{padding:4px 12px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.1em;border:1px solid transparent;cursor:pointer;font-family:inherit;color:var(--dim);background:transparent;transition:all .15s;text-transform:uppercase}
+    .tab-btn:hover{color:var(--text)}
+    .tab-btn.active{color:var(--cyan);border-color:rgba(0,212,255,.35);background:rgba(0,212,255,.06)}
+    .tab-panel{display:none;flex:1;overflow:hidden;flex-direction:column}
+    .tab-panel.active{display:flex}
+
+    /* ── Logs ──────────────────────────────────────────────── */
+    #log-feed{flex:1;overflow-y:auto;padding:6px 8px;display:flex;flex-direction:column;gap:2px}
+    .log-entry{display:flex;gap:8px;padding:3px 6px;border-radius:3px;font-size:10px;line-height:1.4;border-left:2px solid transparent}
+    .log-entry:hover{background:rgba(255,255,255,.015)}
+    .log-entry.INFO{border-left-color:var(--cyan)}
+    .log-entry.WARNING,.log-entry.WARN{border-left-color:var(--yellow)}
+    .log-entry.ERROR{border-left-color:var(--red)}
+    .log-entry.AI{border-left-color:var(--purple)}
+    .log-ts{color:var(--dim);flex-shrink:0;font-size:9px;margin-top:1px}
+    .log-tipo{flex-shrink:0;font-size:8px;font-weight:700;letter-spacing:.08em;min-width:36px}
+    .log-tipo.INFO{color:var(--cyan)}
+    .log-tipo.WARNING,.log-tipo.WARN{color:var(--yellow)}
+    .log-tipo.ERROR{color:var(--red)}
+    .log-tipo.AI{color:var(--purple)}
+    .log-msg{color:var(--text);word-break:break-word}
+
+    /* ── Histórico ─────────────────────────────────────────── */
+    #hist-body{flex:1;overflow-y:auto;padding:8px}
+    .hist-row-win td:first-child{border-left:2px solid var(--green)}
+    .hist-row-loss td:first-child{border-left:2px solid var(--red)}
+
+    /* ── Countdown bar ─────────────────────────────────────── */
+    #countdown-wrap{padding:6px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;background:var(--panel)}
+    #countdown-bar-outer{flex:1;height:3px;background:var(--bg);border-radius:2px;overflow:hidden}
+    #countdown-bar-inner{height:100%;border-radius:2px;background:var(--cyan);transition:width .9s linear}
+    #countdown-label{font-size:9px;color:var(--dim);flex-shrink:0;min-width:90px;text-align:right}
+
+    /* ── Bot status indicator ──────────────────────────────── */
+    .bot-indicator{display:inline-flex;align-items:center;gap:5px;font-size:9px;font-weight:700;letter-spacing:.1em}
+    .bot-dot{width:7px;height:7px;border-radius:50%}
+    .bot-dot.active{background:var(--green);animation:pulse 2s infinite}
+    .bot-dot.inactive{background:var(--dim)}
+
+    /* ── Scan next countdown card ──────────────────────────── */
+    #scan-card .s-value{color:var(--cyan)}
+    #cycle-card .s-value{color:var(--purple)}
+
+    /* ── RSI coloring ──────────────────────────────────────── */
+    .rsi-hot{color:var(--red)}
+    .rsi-cold{color:var(--green)}
+    .rsi-neutral{color:var(--text)}
+
+    /* ── Animations ────────────────────────────────────────── */
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:none}}
+    .fade-in{animation:fadeIn .2s ease}
+
+    /* ── Scanline overlay ──────────────────────────────────── */
+    body::after{content:'';position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.04) 2px,rgba(0,0,0,.04) 4px);z-index:9999}
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Header ──────────────────────────────────────────────────────── -->
+  <header>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+          <div class="logo-dot"></div>
+        </div>
+        <div class="logo-text"><span class="w">IA</span> <span class="c">DAYTRADE</span></div>
+      </div>
+      <div class="badge">DASHBOARD</div>
+    </div>
+    <div class="hdr-nav">
+      <button class="nav-a active">DASHBOARD</button>
+      <a href="/backtest_ui.html" class="nav-a">BACKTEST</a>
+      <a href="/trade_journal.html" class="nav-a">JOURNAL</a>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span id="conn-status" class="err">⬤ OFFLINE</span>
+      <div id="clock">00:00:00</div>
+    </div>
+  </header>
+
+  <!-- ── Status Strip ─────────────────────────────────────────────────── -->
+  <div id="status-strip">
+    <div class="stat-card">
+      <span class="s-label">Capital USDT</span>
+      <span class="s-value" id="s-capital" style="color:var(--cyan)">—</span>
+      <span class="s-sub" id="s-capital-sub">&nbsp;</span>
+    </div>
+    <div class="stat-card">
+      <span class="s-label">P&amp;L do Dia</span>
+      <span class="s-value" id="s-pl">—</span>
+      <span class="s-sub" id="s-pl-sub">&nbsp;</span>
+    </div>
+    <div class="stat-card">
+      <span class="s-label">Ganhos Hoje</span>
+      <span class="s-value" id="s-ganhos" style="color:var(--green)">—</span>
+      <span class="s-sub">&nbsp;</span>
+    </div>
+    <div class="stat-card">
+      <span class="s-label">Perdas Hoje</span>
+      <span class="s-value" id="s-perdas" style="color:var(--red)">—</span>
+      <span class="s-sub">&nbsp;</span>
+    </div>
+    <div class="stat-card">
+      <span class="s-label">Trades Hoje</span>
+      <span class="s-value" id="s-trades" style="color:var(--white)">—</span>
+      <span class="s-sub" id="s-trades-sub">&nbsp;</span>
+    </div>
+    <div class="stat-card" id="scan-card">
+      <span class="s-label">Próximo Scan</span>
+      <span class="s-value" id="s-scan">—</span>
+      <span class="s-sub" id="s-bot-status">&nbsp;</span>
+    </div>
+    <div class="stat-card" id="cycle-card">
+      <span class="s-label">Ciclo Atual</span>
+      <span class="s-value" id="s-ciclo">#—</span>
+      <span class="s-sub">análises executadas</span>
+    </div>
+  </div>
+
+  <!-- ── Main Grid ─────────────────────────────────────────────────────── -->
+  <div id="main-grid">
+
+    <!-- ── Left Column ──────────────────────────────────────────────── -->
+    <div id="col-left">
+
+      <!-- Posições Abertas -->
+      <div class="section" style="flex:1">
+        <div class="section-header">
+          <span class="section-title">Posições Abertas</span>
+          <span class="section-count" id="pos-count">0</span>
+        </div>
+        <div class="section-body" id="pos-body">
+          <div class="empty-state" id="pos-empty">
+            <div class="empty-icon">📂</div>
+            <div class="empty-msg">Nenhuma posição aberta</div>
+            <div class="empty-sub">O bot executará ordens quando houver oportunidades.</div>
+          </div>
+          <table class="tbl" id="pos-table" style="display:none">
+            <thead>
+              <tr>
+                <th>Par</th><th>Lado</th><th>Entrada</th><th>Atual</th>
+                <th>Stop Loss</th><th>Take Profit</th><th>PnL</th><th>Tempo</th>
+              </tr>
+            </thead>
+            <tbody id="pos-tbody"></tbody>
+          </table>
+        </div>
+        <div id="countdown-wrap">
+          <span style="font-size:9px;color:var(--dim);flex-shrink:0">PRÓXIMO SCAN</span>
+          <div id="countdown-bar-outer"><div id="countdown-bar-inner" style="width:0%"></div></div>
+          <span id="countdown-label">— s</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── Right Column ──────────────────────────────────────────────── -->
+    <div id="col-right">
+
+      <!-- Tabs: Oportunidades / Logs / Histórico -->
+      <div class="section" style="flex:1">
+        <div class="tab-bar">
+          <button class="tab-btn active" data-tab="oport">Oportunidades</button>
+          <button class="tab-btn" data-tab="logs">Logs</button>
+          <button class="tab-btn" data-tab="hist">Histórico</button>
+        </div>
+
+        <!-- Tab: Oportunidades -->
+        <div class="tab-panel active" id="tab-oport">
+          <div class="section-header" style="border-top:none">
+            <span class="section-title">Scanner de Mercado</span>
+            <span class="section-count" id="oport-count">0</span>
+          </div>
+          <div style="flex:1;overflow-y:auto;padding:4px 0">
+            <table class="tbl" id="oport-table">
+              <thead>
+                <tr>
+                  <th>Par</th><th>Var%</th><th>Volume</th>
+                  <th>RSI</th><th>Sinal</th><th>Conf%</th><th>Score</th>
+                </tr>
+              </thead>
+              <tbody id="oport-tbody">
+                <tr><td colspan="7">
+                  <div class="empty-state">
+                    <div class="empty-icon">🔍</div>
+                    <div class="empty-msg">Aguardando análise</div>
+                    <div class="empty-sub">Disponível após o primeiro ciclo.</div>
+                  </div>
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab: Logs -->
+        <div class="tab-panel" id="tab-logs">
+          <div class="section-header" style="border-top:none">
+            <span class="section-title">Log do Bot</span>
+            <span id="log-count" class="section-count">0</span>
+          </div>
+          <div id="log-feed">
+            <div class="empty-state">
+              <div class="empty-icon">📋</div>
+              <div class="empty-msg">Nenhum log disponível</div>
+              <div class="empty-sub">Os logs aparecem quando o bot está rodando.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Histórico -->
+        <div class="tab-panel" id="tab-hist">
+          <div class="section-header" style="border-top:none">
+            <span class="section-title">Histórico de Trades</span>
+            <span id="hist-count" class="section-count">0</span>
+          </div>
+          <div id="hist-body">
+            <table class="tbl" id="hist-table">
+              <thead>
+                <tr>
+                  <th>Par</th><th>Lado</th><th>Entrada</th><th>Saída</th>
+                  <th>P&L%</th><th>P&L $</th><th>Motivo</th>
+                </tr>
+              </thead>
+              <tbody id="hist-tbody">
+                <tr><td colspan="7">
+                  <div class="empty-state">
+                    <div class="empty-icon">📊</div>
+                    <div class="empty-msg">Sem histórico</div>
+                    <div class="empty-sub">Os trades fechados aparecerão aqui.</div>
+                  </div>
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+const API_URL = "http://45.84.138.77:8080"
+const POLL_MS  = 3000   // intervalo de polling em ms
+const SCAN_MAX = 300    // duração total do ciclo (seg) para a barra de progresso
+
+// ─── RELÓGIO ──────────────────────────────────────────────────────────────────
+setInterval(() => {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit', second:'2-digit'})
+}, 1000)
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'))
+    btn.classList.add('active')
+    document.getElementById('tab-' + tab).classList.add('active')
+  })
+})
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function fmt$(v, decimals=2) {
+  if (v == null) return '—'
+  const n = Number(v)
+  return '$' + n.toFixed(decimals)
+}
+function fmtPct(v) {
+  if (v == null) return '—'
+  const n = Number(v)
+  return (n >= 0 ? '+' : '') + n.toFixed(2) + '%'
+}
+function fmtVol(v) {
+  if (v == null) return '—'
+  const n = Number(v)
+  if (n >= 1e9) return (n/1e9).toFixed(1) + 'B'
+  if (n >= 1e6) return (n/1e6).toFixed(1) + 'M'
+  if (n >= 1e3) return (n/1e3).toFixed(0) + 'K'
+  return n.toFixed(0)
+}
+function fmtTime(sec) {
+  if (sec == null || sec <= 0) return '—'
+  const m = Math.floor(sec / 60), s = sec % 60
+  return m > 0 ? `${m}m ${s}s` : `${s}s`
+}
+function setConnStatus(ok) {
+  const el = document.getElementById('conn-status')
+  if (ok) { el.textContent = '⬤ ONLINE'; el.className = 'ok' }
+  else     { el.textContent = '⬤ OFFLINE'; el.className = 'err' }
+}
+function colorPnl(v) { return Number(v) >= 0 ? 'var(--green)' : 'var(--red)' }
+function colorRsi(v) {
+  const n = Number(v)
+  if (n > 70) return 'rsi-hot'
+  if (n < 30) return 'rsi-cold'
+  return 'rsi-neutral'
+}
+function sigClass(s) {
+  if (!s) return 'sig-aguardar'
+  switch (s.toUpperCase()) {
+    case 'COMPRAR': return 'sig-comprar'
+    case 'VENDER':  return 'sig-vender'
+    default:        return 'sig-aguardar'
+  }
+}
+
+// ─── COUNTDOWN ────────────────────────────────────────────────────────────────
+let _scanMax = SCAN_MAX
+function updateCountdown(sec) {
+  if (sec > _scanMax) _scanMax = sec
+  const pct = _scanMax > 0 ? (sec / _scanMax) * 100 : 0
+  document.getElementById('countdown-bar-inner').style.width = pct + '%'
+  document.getElementById('countdown-label').textContent = fmtTime(sec)
+}
+
+// ─── FETCH /status ────────────────────────────────────────────────────────────
+async function fetchStatus() {
+  const r = await fetch(API_URL + '/status', { signal: AbortSignal.timeout(2500) })
+  const d = await r.json()
+
+  // Cards
+  document.getElementById('s-capital').textContent = fmt$(d.capital_usdt, 2)
+
+  const pl = Number(d.pl_dia)
+  const plEl = document.getElementById('s-pl')
+  plEl.textContent = (pl >= 0 ? '+' : '') + fmt$(pl, 2)
+  plEl.style.color = colorPnl(pl)
+  const plSubEl = document.getElementById('s-pl-sub')
+  const plPct = d.capital_usdt > 0 ? (pl / d.capital_usdt * 100) : 0
+  plSubEl.textContent = (plPct >= 0 ? '+' : '') + plPct.toFixed(2) + '% do capital'
+  plSubEl.style.color = colorPnl(pl)
+
+  document.getElementById('s-ganhos').textContent = fmt$(d.ganhos_hoje, 2)
+  document.getElementById('s-perdas').textContent = fmt$(d.perdas_hoje, 2)
+
+  document.getElementById('s-trades').textContent = `${d.trades_hoje}/${d.max_trades}`
+  const tradesLeft = d.max_trades - d.trades_hoje
+  document.getElementById('s-trades-sub').textContent = `${tradesLeft} restantes hoje`
+
+  document.getElementById('s-scan').textContent = fmtTime(d.proximo_scan)
+  updateCountdown(d.proximo_scan)
+
+  const botEl = document.getElementById('s-bot-status')
+  botEl.innerHTML = d.bot_ativo
+    ? '<span class="bot-indicator"><span class="bot-dot active"></span>BOT ATIVO</span>'
+    : '<span class="bot-indicator"><span class="bot-dot inactive"></span>BOT INATIVO</span>'
+
+  document.getElementById('s-ciclo').textContent = '#' + (d.ciclo_atual || 0)
+
+  // Posições abertas
+  const posicoes = d.posicoes_abertas || []
+  document.getElementById('pos-count').textContent = posicoes.length
+  const tbody = document.getElementById('pos-tbody')
+  const posEmpty = document.getElementById('pos-empty')
+  const posTable = document.getElementById('pos-table')
+
+  if (posicoes.length === 0) {
+    posEmpty.style.display = 'flex'
+    posTable.style.display = 'none'
+  } else {
+    posEmpty.style.display = 'none'
+    posTable.style.display = 'table'
+    tbody.innerHTML = posicoes.map(p => {
+      const pnl = Number(p.pnl)
+      const pnlColor = colorPnl(pnl)
+      const sideClass = p.lado === 'LONG' ? 'side-long' : 'side-short'
+      return `<tr class="fade-in">
+        <td style="color:var(--white);font-weight:600">${p.symbol}</td>
+        <td><span class="side-chip ${sideClass}">${p.lado}</span></td>
+        <td>${fmt$(p.entrada, 4)}</td>
+        <td>${fmt$(p.preco_atual, 4)}</td>
+        <td style="color:var(--red)">${fmt$(p.stop_loss, 4)}</td>
+        <td style="color:var(--green)">${fmt$(p.take_profit, 4)}</td>
+        <td style="color:${pnlColor};font-weight:700">${(pnl >= 0 ? '+' : '') + pnl.toFixed(2)}%</td>
+        <td style="color:var(--dim)">${p.tempo_aberto || '—'}</td>
+      </tr>`
+    }).join('')
+  }
+}
+
+// ─── FETCH /logs ──────────────────────────────────────────────────────────────
+async function fetchLogs() {
+  const r = await fetch(API_URL + '/logs', { signal: AbortSignal.timeout(2500) })
+  const logs = await r.json()
+
+  document.getElementById('log-count').textContent = logs.length
+  const feed = document.getElementById('log-feed')
+  if (!logs.length) return
+
+  feed.innerHTML = logs.map(l => {
+    const ts = l.timestamp
+      ? new Date(l.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit', second:'2-digit'})
+      : ''
+    const tipo = (l.tipo || 'INFO').toUpperCase()
+    const msg  = (l.mensagem || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    return `<div class="log-entry ${tipo}">
+      <span class="log-ts">${ts}</span>
+      <span class="log-tipo ${tipo}">${tipo.slice(0,4)}</span>
+      <span class="log-msg">${msg}</span>
+    </div>`
+  }).join('')
+}
+
+// ─── FETCH /oportunidades ─────────────────────────────────────────────────────
+async function fetchOportunidades() {
+  const r    = await fetch(API_URL + '/oportunidades', { signal: AbortSignal.timeout(2500) })
+  const data = await r.json()
+
+  document.getElementById('oport-count').textContent = data.length
+  const tbody = document.getElementById('oport-tbody')
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="7">
+      <div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-msg">Aguardando análise</div>
+        <div class="empty-sub">Disponível após o primeiro ciclo.</div>
+      </div>
+    </td></tr>`
+    return
+  }
+
+  tbody.innerHTML = data.map(o => {
+    const varPct  = Number(o.variacao)
+    const varColor = varPct >= 0 ? 'var(--green)' : 'var(--red)'
+    const rsiClass = colorRsi(o.rsi)
+    const sClass   = sigClass(o.sinal)
+    const confColor = Number(o.confianca) >= 80 ? 'var(--green)'
+                    : Number(o.confianca) >= 65 ? 'var(--cyan)' : 'var(--yellow)'
+    return `<tr class="fade-in">
+      <td style="color:var(--white);font-weight:600">${o.symbol}</td>
+      <td style="color:${varColor}">${fmtPct(o.variacao)}</td>
+      <td style="color:var(--dim)">${fmtVol(o.volume)}</td>
+      <td class="${rsiClass}" style="font-weight:600">${Number(o.rsi||0).toFixed(1)}</td>
+      <td><span class="sig-chip ${sClass}">${o.sinal || 'AGUARDAR'}</span></td>
+      <td style="color:${confColor};font-weight:700">${o.confianca || 0}%</td>
+      <td style="color:var(--purple)">${fmtVol(o.score_explosao)}</td>
+    </tr>`
+  }).join('')
+}
+
+// ─── FETCH /historico ─────────────────────────────────────────────────────────
+async function fetchHistorico() {
+  const r    = await fetch(API_URL + '/historico', { signal: AbortSignal.timeout(2500) })
+  const data = await r.json()
+  if (!Array.isArray(data)) return
+
+  document.getElementById('hist-count').textContent = data.length
+  const tbody = document.getElementById('hist-tbody')
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="7">
+      <div class="empty-state">
+        <div class="empty-icon">📊</div>
+        <div class="empty-msg">Sem histórico</div>
+        <div class="empty-sub">Os trades fechados aparecerão aqui.</div>
+      </div>
+    </td></tr>`
+    return
+  }
+
+  // Mostra os 50 mais recentes (vem ordenado do mais antigo ao mais novo)
+  const recentes = [...data].reverse().slice(0, 50)
+  tbody.innerHTML = recentes.map(t => {
+    const pnlColor  = Number(t.resultado_usdt) >= 0 ? 'var(--green)' : 'var(--red)'
+    const sideClass = t.lado === 'LONG' ? 'side-long' : 'side-short'
+    const rowClass  = Number(t.resultado_usdt) >= 0 ? 'hist-row-win' : 'hist-row-loss'
+    const motivo    = t.fechado_em
+      ? new Date(t.fechado_em).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})
+      : '—'
+    return `<tr class="${rowClass} fade-in">
+      <td style="color:var(--white);font-weight:600">${t.symbol || '—'}</td>
+      <td><span class="side-chip ${sideClass}">${t.lado || '—'}</span></td>
+      <td>${fmt$(t.preco_entrada, 4)}</td>
+      <td>—</td>
+      <td style="color:${pnlColor};font-weight:700">${Number(t.resultado_usdt) >= 0 ? '+' : ''}${Number(t.resultado_usdt || 0).toFixed(2)}</td>
+      <td style="color:${pnlColor}">${fmt$(t.resultado_usdt, 2)}</td>
+      <td style="color:var(--dim);font-size:9px">${motivo}</td>
+    </tr>`
+  }).join('')
+}
+
+// ─── POLLING PRINCIPAL ────────────────────────────────────────────────────────
+async function pollAll() {
+  let ok = false
+  try {
+    await Promise.all([
+      fetchStatus(),
+      fetchLogs(),
+      fetchOportunidades(),
+      fetchHistorico(),
+    ])
+    ok = true
+  } catch (e) {
+    console.warn('[poll]', e.message)
+  }
+  setConnStatus(ok)
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+pollAll()
+setInterval(pollAll, POLL_MS)
+</script>
+</body>
+</html>
